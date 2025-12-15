@@ -1,4 +1,4 @@
-# codex-api-gateway
+# codex-api
 
 Expose `codex exec` as a small OpenAI-compatible HTTP API (local or deployable).
 
