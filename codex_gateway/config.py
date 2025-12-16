@@ -132,6 +132,9 @@ class Settings:
     allow_client_model_override: bool = _env_bool("CODEX_ALLOW_CLIENT_MODEL_OVERRIDE", False)
 
     cursor_agent_bin: str = os.environ.get("CURSOR_AGENT_BIN", "cursor-agent")
+    # Cursor Agent workspace can be decoupled from CODEX_WORKSPACE to avoid leaking/reading a repo
+    # when using cursor-agent for non-coding tasks (e.g. phone UI automation).
+    cursor_agent_workspace: str | None = (_env_str("CURSOR_AGENT_WORKSPACE", "").strip() or None)
     cursor_agent_api_key: str | None = os.environ.get("CURSOR_AGENT_API_KEY") or os.environ.get("CURSOR_API_KEY")
     cursor_agent_model: str | None = (_env_str("CURSOR_AGENT_MODEL", "").strip() or None)
     cursor_agent_stream_partial_output: bool = _env_bool("CURSOR_AGENT_STREAM_PARTIAL_OUTPUT", True)

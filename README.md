@@ -255,6 +255,7 @@ Optional env vars:
 - `CURSOR_AGENT_BIN`, `CLAUDE_BIN`, `GEMINI_BIN`: override the CLI binary names/paths
 - `CURSOR_AGENT_API_KEY` / `CURSOR_API_KEY`: Cursor authentication for `cursor-agent`
 - `CURSOR_AGENT_MODEL`, `CLAUDE_MODEL`, `GEMINI_MODEL`: default model when the prefix doesn’t include `:<model>`
+- `CURSOR_AGENT_WORKSPACE`: override `--workspace` just for `cursor-agent` (use an empty dir to avoid repo reads for automation workloads)
 
 ## Keywords (SEO)
 

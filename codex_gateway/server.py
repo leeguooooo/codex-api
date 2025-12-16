@@ -377,6 +377,7 @@ async def debug_config(authorization: str | None = Header(default=None)):
         "allow_client_model_override": settings.allow_client_model_override,
         "default_model": settings.default_model,
         "cursor_agent_model": settings.cursor_agent_model or "auto",
+        "cursor_agent_workspace": settings.cursor_agent_workspace,
         "claude_model": settings.claude_model,
         "gemini_model": settings.gemini_model,
         "model_reasoning_effort": settings.model_reasoning_effort,
@@ -748,13 +749,14 @@ async def chat_completions(
                         if settings.debug_log:
                             src = "request" if provider_model else ("env" if settings.cursor_agent_model else "default")
                             logger.info("[%s] cursor-agent model=%s model_src=%s", resp_id, cursor_model, src)
+                        cursor_workspace = settings.cursor_agent_workspace or settings.workspace
                         cmd = [
                             settings.cursor_agent_bin,
                             "-p",
                             "--output-format",
                             "stream-json",
                             "--workspace",
-                            settings.workspace,
+                            cursor_workspace,
                         ]
                         if settings.cursor_agent_api_key:
                             cmd.extend(["--api-key", settings.cursor_agent_api_key])
@@ -974,13 +976,14 @@ async def chat_completions(
                             if settings.debug_log:
                                 src = "request" if provider_model else ("env" if settings.cursor_agent_model else "default")
                                 logger.info("[%s] cursor-agent model=%s model_src=%s", resp_id, cursor_model, src)
+                            cursor_workspace = settings.cursor_agent_workspace or settings.workspace
                             cmd = [
                                 settings.cursor_agent_bin,
                                 "-p",
                                 "--output-format",
                                 "stream-json",
                                 "--workspace",
-                                settings.workspace,
+                                cursor_workspace,
                             ]
                             if settings.cursor_agent_api_key:
                                 cmd.extend(["--api-key", settings.cursor_agent_api_key])
