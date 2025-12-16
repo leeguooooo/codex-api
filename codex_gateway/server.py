@@ -316,10 +316,11 @@ def _materialize_request_images(
 async def _log_startup_config() -> None:
     # Intentionally omit secrets (tokens, API keys).
     logger.info(
-        "Gateway config: workspace=%s provider=%s allow_client_provider_override=%s default_model=%s model_reasoning_effort=%s force_reasoning_effort=%s use_codex_responses_api=%s max_concurrency=%s sse_keepalive_seconds=%s strip_answer_tags=%s debug_log=%s",
+        "Gateway config: workspace=%s provider=%s allow_client_provider_override=%s allow_client_model_override=%s default_model=%s model_reasoning_effort=%s force_reasoning_effort=%s use_codex_responses_api=%s max_concurrency=%s sse_keepalive_seconds=%s strip_answer_tags=%s debug_log=%s",
         settings.workspace,
         settings.provider,
         settings.allow_client_provider_override,
+        settings.allow_client_model_override,
         settings.default_model,
         settings.model_reasoning_effort,
         settings.force_reasoning_effort,
@@ -370,6 +371,7 @@ async def debug_config(authorization: str | None = Header(default=None)):
     return {
         "provider": settings.provider,
         "allow_client_provider_override": settings.allow_client_provider_override,
+        "allow_client_model_override": settings.allow_client_model_override,
         "default_model": settings.default_model,
         "model_reasoning_effort": settings.model_reasoning_effort,
         "force_reasoning_effort": settings.force_reasoning_effort,
@@ -411,6 +413,9 @@ async def chat_completions(
     else:
         # Operator forces a single provider for the whole gateway; ignore request-side provider prefixes.
         provider = forced_provider
+        if not settings.allow_client_model_override:
+            # Operator decides the provider model; ignore client-sent model strings.
+            provider_model = None
     allowed_efforts = {"low", "medium", "high", "xhigh"}
 
     def _normalize_effort(raw: str | None) -> str | None:

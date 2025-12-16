@@ -213,6 +213,7 @@ console.log(resp.choices[0].message.content);
 - `CODEX_PROVIDER`: `auto|codex|cursor-agent|claude|gemini` (default: `auto`) choose which CLI/provider this gateway uses
   - If not `auto`, the gateway ignores request-side provider prefixes like `cursor:...` by default (operator-controlled).
 - `CODEX_ALLOW_CLIENT_PROVIDER_OVERRIDE`: `1/0` (default: `0`) allow request-side provider prefixes to override `CODEX_PROVIDER`
+- `CODEX_ALLOW_CLIENT_MODEL_OVERRIDE`: `1/0` (default: `0`) allow the client to override the provider-specific model via request `model`
 - `CODEX_MODEL_REASONING_EFFORT`: `low|medium|high|xhigh` (default: `low`)
 - `CODEX_FORCE_REASONING_EFFORT`: if set, overrides any request-provided effort (e.g. force `low` for automation)
 - `CODEX_SANDBOX`: `read-only` | `workspace-write` | `danger-full-access` (default: `read-only`)
@@ -241,6 +242,7 @@ console.log(resp.choices[0].message.content);
 If you have other agent CLIs installed, you can either:
 
 - Force a single provider via `CODEX_PROVIDER=codex|cursor-agent|claude|gemini` (recommended for “API callers can’t choose agent”).
+  - For Cursor “auto”: set `CURSOR_AGENT_MODEL=auto` and keep `CODEX_ALLOW_CLIENT_MODEL_OVERRIDE=0` so client `model` strings are ignored.
 - Or keep `CODEX_PROVIDER=auto` and select providers per-request by prefixing `model`:
 
 - Codex CLI: `"gpt-5.2"` (default) or any Codex model id

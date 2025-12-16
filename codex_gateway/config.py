@@ -125,6 +125,11 @@ class Settings:
     provider: GatewayProvider = _env_str("CODEX_PROVIDER", "auto").strip().lower()  # type: ignore[assignment]
     # If true, always allow request `model` prefixes (cursor:/claude:/gemini:) to override provider.
     allow_client_provider_override: bool = _env_bool("CODEX_ALLOW_CLIENT_PROVIDER_OVERRIDE", False)
+    # If true, allow the client to choose the provider-specific model (e.g. pass `gpt-5.2` to Codex,
+    # or pass `sonnet` to Claude) via the request `model` field. When false, the gateway uses its
+    # configured defaults (e.g. CURSOR_AGENT_MODEL / CLAUDE_MODEL / GEMINI_MODEL) and ignores the
+    # client-sent model string (still accepted for OpenAI client compatibility).
+    allow_client_model_override: bool = _env_bool("CODEX_ALLOW_CLIENT_MODEL_OVERRIDE", False)
 
     cursor_agent_bin: str = os.environ.get("CURSOR_AGENT_BIN", "cursor-agent")
     cursor_agent_api_key: str | None = os.environ.get("CURSOR_AGENT_API_KEY") or os.environ.get("CURSOR_API_KEY")
