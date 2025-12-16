@@ -4,6 +4,8 @@ Expose popular **agent CLIs** as a small **OpenAI-compatible** HTTP API (`/v1/*`
 
 Works great as a local gateway (localhost) or behind a reverse proxy.
 
+Think of it as **LiteLLM for agent CLIs**: you point existing OpenAI SDKs/tools at `base_url`, and choose a backend by `model`.
+
 Supported backends:
 - OpenAI Codex CLI (`codex exec`)
 - Cursor Agent CLI (`cursor-agent`)
@@ -97,6 +99,39 @@ curl -N http://127.0.0.1:8000/v1/chat/completions \
     "messages":[{"role":"user","content":"用一句话解释这个项目的目的"}],
     "stream": true
   }'
+```
+
+### OpenAI SDK examples
+
+Python:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="devtoken")
+resp = client.chat.completions.create(
+    model="gpt-5.2",
+    messages=[{"role": "user", "content": "Hi"}],
+)
+print(resp.choices[0].message.content)
+```
+
+TypeScript:
+
+```ts
+import OpenAI from "openai";
+
+const client = new OpenAI({
+  baseURL: "http://127.0.0.1:8000/v1",
+  apiKey: process.env.CODEX_GATEWAY_TOKEN ?? "devtoken",
+});
+
+const resp = await client.chat.completions.create({
+  model: "gpt-5.2",
+  messages: [{ role: "user", content: "Hi" }],
+});
+
+console.log(resp.choices[0].message.content);
 ```
 
 ## Configuration (env vars)
