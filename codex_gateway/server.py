@@ -181,8 +181,8 @@ def _openai_error(message: str, *, status_code: int = 500) -> JSONResponse:
     return JSONResponse(status_code=status_code, content=payload)
 
 
-_UPSTREAM_STATUS_RE = re.compile(r"(?:\\bAPI Error:\\s*|\\bfailed:\\s*)(\\d{3})\\b")
-_GENERIC_STATUS_RE = re.compile(r"\\bstatus\\s*[=:]\\s*(\\d{3})\\b")
+_UPSTREAM_STATUS_RE = re.compile(r"(?:\bAPI Error:\s*|\bfailed:\s*)(\d{3})\b")
+_GENERIC_STATUS_RE = re.compile(r"\bstatus\s*[=:]\s*(\d{3})\b")
 
 
 def _extract_upstream_status_code(err: BaseException) -> int | None:
