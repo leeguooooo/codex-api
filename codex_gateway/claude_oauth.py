@@ -7,9 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from .config import settings
+from .http_client import get_async_client, request_json_with_retries
 from .openai_compat import ChatCompletionRequest, ChatMessage
 
 _ANTHROPIC_VERSION = "2023-06-01"
@@ -80,10 +79,17 @@ async def _refresh_access_token(
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
     }
-    async with httpx.AsyncClient(timeout=timeout_s) as client:
-        resp = await client.post(url, json=payload, headers={"Accept": "application/json"})
-        resp.raise_for_status()
-        data = resp.json()
+    client = await get_async_client("claude-oauth")
+    resp = await request_json_with_retries(
+        client=client,
+        method="POST",
+        url=url,
+        timeout_s=timeout_s,
+        json=payload,
+        headers={"Accept": "application/json"},
+    )
+    resp.raise_for_status()
+    data = resp.json()
     if not isinstance(data, dict):
         raise ValueError("Claude OAuth refresh: invalid JSON response")
     access_token = data.get("access_token")
@@ -247,10 +253,17 @@ async def generate_oauth(
         "Accept": "application/json",
     }
     url = f"{settings.claude_api_base_url.rstrip('/')}/v1/messages"
-    async with httpx.AsyncClient(timeout=settings.timeout_seconds) as client:
-        resp = await client.post(url, json=payload, headers=headers)
-        resp.raise_for_status()
-        data = resp.json()
+    client = await get_async_client("claude")
+    resp = await request_json_with_retries(
+        client=client,
+        method="POST",
+        url=url,
+        timeout_s=settings.timeout_seconds,
+        json=payload,
+        headers=headers,
+    )
+    resp.raise_for_status()
+    data = resp.json()
 
     return _extract_text_from_anthropic_response(data), _extract_usage_from_anthropic_response(data)
 
@@ -340,10 +353,10 @@ async def iter_oauth_stream_events(
     url = f"{settings.claude_api_base_url.rstrip('/')}/v1/messages"
 
     usage: dict[str, int] | None = None
-    async with httpx.AsyncClient(timeout=settings.timeout_seconds) as client:
-        async with client.stream("POST", url, json=payload, headers=headers) as resp:
-            resp.raise_for_status()
-            async for _, data in _iter_sse_events(resp):
+    client = await get_async_client("claude-stream")
+    async with client.stream("POST", url, json=payload, headers=headers, timeout=settings.timeout_seconds) as resp:
+        resp.raise_for_status()
+        async for _, data in _iter_sse_events(resp):
                 if not data or data.strip() == "[DONE]":
                     continue
                 try:
@@ -362,4 +375,3 @@ async def iter_oauth_stream_events(
 
     if usage:
         yield {"type": "result", "usage": {"input_tokens": usage["prompt_tokens"], "output_tokens": usage["completion_tokens"]}}
-

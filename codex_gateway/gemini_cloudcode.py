@@ -10,9 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from .config import settings
+from .http_client import get_async_client, request_json_with_retries
 from .openai_compat import ChatCompletionRequest, ChatMessage
 
 
@@ -173,6 +172,10 @@ def _load_oauth_creds(path: str) -> GeminiOAuthCreds:
     )
 
 
+def load_gemini_creds(path: str | Path) -> GeminiOAuthCreds:
+    return _load_oauth_creds(str(path))
+
+
 def _is_expired(expiry_date_ms: int | None, *, skew_seconds: int = 60) -> bool:
     if not expiry_date_ms:
         return True
@@ -192,10 +195,20 @@ async def _refresh_access_token(
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
     }
-    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-        resp = await client.post("https://oauth2.googleapis.com/token", data=data, headers={"Accept": "application/json"})
-        resp.raise_for_status()
-        return resp.json()
+    client = await get_async_client("gemini-oauth")
+    resp = await request_json_with_retries(
+        client=client,
+        method="POST",
+        url="https://oauth2.googleapis.com/token",
+        timeout_s=timeout_seconds,
+        data=data,
+        headers={"Accept": "application/json"},
+    )
+    resp.raise_for_status()
+    obj = resp.json()
+    if not isinstance(obj, dict):
+        raise RuntimeError("Gemini OAuth refresh failed: invalid JSON response")
+    return obj
 
 
 async def get_gemini_access_token(*, timeout_seconds: int) -> str:
@@ -257,10 +270,16 @@ async def resolve_gemini_project_id(*, access_token: str, timeout_seconds: int) 
 
     url = "https://cloudresourcemanager.googleapis.com/v1/projects?pageSize=10"
     headers = {"Authorization": f"Bearer {access_token}", "Accept": "application/json"}
-    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-        resp = await client.get(url, headers=headers)
-        resp.raise_for_status()
-        obj = resp.json()
+    client = await get_async_client("gemini-cloudresourcemanager")
+    resp = await request_json_with_retries(
+        client=client,
+        method="GET",
+        url=url,
+        timeout_s=timeout_seconds,
+        headers=headers,
+    )
+    resp.raise_for_status()
+    obj = resp.json()
     project_id: str | None = None
     if isinstance(obj, dict) and isinstance(obj.get("projects"), list):
         for item in obj["projects"]:
@@ -423,7 +442,9 @@ def _extract_usage_from_cloudcode_response(obj: dict[str, Any]) -> dict[str, int
         return None
     prompt = int(usage.get("promptTokenCount") or 0)
     completion = int(usage.get("candidatesTokenCount") or 0)
-    total = int(usage.get("totalTokenCount") or (prompt + completion))
+    # Some backends report a totalTokenCount that doesn't equal prompt+completion.
+    # For OpenAI-compatible usage, keep total_tokens consistent.
+    total = prompt + completion
     return {
         "prompt_tokens": prompt,
         "completion_tokens": completion,
@@ -460,14 +481,21 @@ async def generate_cloudcode(
         reasoning_effort=reasoning_effort,
     )
     url = f"{settings.gemini_cloudcode_base_url}/v1internal:generateContent"
-    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-        resp = await client.post(url, json=payload, headers=_cloudcode_headers(access, stream=False))
-        if resp.status_code < 200 or resp.status_code >= 300:
-            detail = (resp.text or "").strip()
-            if len(detail) > 2000:
-                detail = detail[:2000] + "…"
-            raise RuntimeError(f"gemini cloudcode failed: {resp.status_code} {detail}".strip())
-        obj = resp.json()
+    client = await get_async_client("gemini-cloudcode")
+    resp = await request_json_with_retries(
+        client=client,
+        method="POST",
+        url=url,
+        timeout_s=timeout_seconds,
+        json=payload,
+        headers=_cloudcode_headers(access, stream=False),
+    )
+    if resp.status_code < 200 or resp.status_code >= 300:
+        detail = (resp.text or "").strip()
+        if len(detail) > 2000:
+            detail = detail[:2000] + "…"
+        raise RuntimeError(f"gemini cloudcode failed: {resp.status_code} {detail}".strip())
+    obj = resp.json()
     if not isinstance(obj, dict):
         return "", None
     return _extract_text_from_cloudcode_response(obj), _extract_usage_from_cloudcode_response(obj)
@@ -498,39 +526,45 @@ async def iter_cloudcode_stream_events(
     url = f"{settings.gemini_cloudcode_base_url}/v1internal:streamGenerateContent?alt=sse"
 
     last_usage: dict[str, int] | None = None
-    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
-        async with client.stream("POST", url, json=payload, headers=_cloudcode_headers(access, stream=True)) as resp:
-            if resp.status_code < 200 or resp.status_code >= 300:
-                detail = (await resp.aread()).decode(errors="ignore").strip()
-                if len(detail) > 2000:
-                    detail = detail[:2000] + "…"
-                raise RuntimeError(f"gemini cloudcode failed: {resp.status_code} {detail}".strip())
-            async for line in resp.aiter_lines():
-                raw = (line or "").strip()
-                if not raw:
-                    continue
-                if not raw.startswith("data:"):
-                    continue
-                data = raw[len("data:") :].strip()
-                if not data:
-                    continue
-                if data == "[DONE]":
-                    break
-                try:
-                    obj = json.loads(data)
-                except Exception:
-                    continue
-                if not isinstance(obj, dict):
-                    continue
-                text = _extract_text_from_cloudcode_response(obj)
-                if text:
-                    evt = {"type": "message", "role": "assistant", "content": text}
-                    if event_callback:
-                        event_callback(evt)
-                    yield evt
-                usage = _extract_usage_from_cloudcode_response(obj)
-                if usage:
-                    last_usage = usage
+    client = await get_async_client("gemini-cloudcode-stream")
+    async with client.stream(
+        "POST",
+        url,
+        json=payload,
+        headers=_cloudcode_headers(access, stream=True),
+        timeout=timeout_seconds,
+    ) as resp:
+        if resp.status_code < 200 or resp.status_code >= 300:
+            detail = (await resp.aread()).decode(errors="ignore").strip()
+            if len(detail) > 2000:
+                detail = detail[:2000] + "…"
+            raise RuntimeError(f"gemini cloudcode failed: {resp.status_code} {detail}".strip())
+        async for line in resp.aiter_lines():
+            raw = (line or "").strip()
+            if not raw:
+                continue
+            if not raw.startswith("data:"):
+                continue
+            data = raw[len("data:") :].strip()
+            if not data:
+                continue
+            if data == "[DONE]":
+                break
+            try:
+                obj = json.loads(data)
+            except Exception:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            text = _extract_text_from_cloudcode_response(obj)
+            if text:
+                evt = {"type": "message", "role": "assistant", "content": text}
+                if event_callback:
+                    event_callback(evt)
+                yield evt
+            usage = _extract_usage_from_cloudcode_response(obj)
+            if usage:
+                last_usage = usage
 
     if last_usage:
         evt = {

@@ -46,6 +46,7 @@ uv run agent-cli-to-api codex
 uv run agent-cli-to-api gemini
 uv run agent-cli-to-api claude
 uv run agent-cli-to-api cursor-agent
+uv run agent-cli-to-api doctor
 ```
 
 By default `agent-cli-to-api` does NOT load `.env` implicitly.
@@ -66,6 +67,17 @@ Notes:
 - If `CODEX_WORKSPACE` is unset, the gateway creates an empty temp workspace under `/tmp` (so you don't need to configure a repo path).
 - When you start with a fixed provider (e.g. `... gemini`), the client-sent `model` string is accepted but ignored by default (gateway uses the provider's default model).
 - Each provider still requires its own local CLI login state (no API key is required for Codex / Gemini CloudCode / Claude OAuth).
+
+Quick smoke test (optional):
+
+```bash
+# In another terminal, run:
+#   uv run agent-cli-to-api codex
+# Then:
+BASE_URL=http://127.0.0.1:8000/v1 ./scripts/smoke.sh
+# If you enabled auth:
+TOKEN=devtoken BASE_URL=http://127.0.0.1:8000/v1 ./scripts/smoke.sh
+```
 
 ## API
 

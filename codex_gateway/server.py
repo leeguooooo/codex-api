@@ -28,6 +28,7 @@ from .claude_oauth import generate_oauth as claude_oauth_generate
 from .claude_oauth import iter_oauth_stream_events as iter_claude_oauth_events
 from .gemini_cloudcode import generate_cloudcode as gemini_cloudcode_generate
 from .gemini_cloudcode import iter_cloudcode_stream_events as iter_gemini_cloudcode_events
+from .http_client import aclose_all as _aclose_http_clients
 from .openai_compat import (
     ChatCompletionRequest,
     ChatMessage,
@@ -351,6 +352,11 @@ async def _log_startup_config() -> None:
     )
 
 
+@app.on_event("shutdown")
+async def _shutdown() -> None:
+    await _aclose_http_clients()
+
+
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
@@ -361,7 +367,15 @@ async def list_models(authorization: str | None = Header(default=None)):
     _check_auth(authorization)
     forced_provider = _normalize_provider(settings.provider)
     default_id = _provider_default_model(forced_provider) or settings.default_model
-    models = settings.advertised_models[:] if settings.advertised_models else [default_id]
+    if settings.advertised_models:
+        models = settings.advertised_models[:]
+    elif forced_provider != "auto" and not settings.allow_client_model_override:
+        # When the provider is fixed (operator-controlled), the client-sent `model` string is
+        # accepted but ignored by default, so we advertise a stable placeholder plus the
+        # provider's default model name.
+        models = ["default", default_id]
+    else:
+        models = [default_id]
     if settings.model_aliases:
         models.extend(settings.model_aliases.keys())
         models.extend(settings.model_aliases.values())

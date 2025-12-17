@@ -56,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
         "provider",
         nargs="?",
         default=None,
-        help="Provider to use: codex|gemini|claude|cursor-agent (default: auto).",
+        help="Provider to use: codex|gemini|claude|cursor-agent (or `doctor`).",
     )
     parser.add_argument(
         "--host",
@@ -81,7 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--env-file",
-        default=os.environ.get("CODEX_ENV_FILE") or os.environ.get("CODEX_GATEWAY_ENV_FILE"),
+        default=None,
         help="Optionally load environment variables from this .env file.",
     )
     parser.add_argument(
@@ -101,10 +101,6 @@ def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    normalized_provider = _normalize_provider(args.provider)
-    if args.provider and not normalized_provider:
-        raise SystemExit(f"Unknown provider: {args.provider}")
-
     if args.env_file:
         path = Path(args.env_file)
         _maybe_load_dotenv(path)
@@ -119,6 +115,18 @@ def main(argv: list[str] | None = None) -> None:
     else:
         # Default: do not load any .env implicitly.
         os.environ.setdefault("CODEX_NO_DOTENV", "1")
+
+    provider_raw = (args.provider or "").strip().lower()
+    if provider_raw == "doctor":
+        import asyncio
+
+        from .doctor import run_doctor
+
+        raise SystemExit(asyncio.run(run_doctor()))
+
+    normalized_provider = _normalize_provider(args.provider)
+    if args.provider and not normalized_provider:
+        raise SystemExit(f"Unknown provider: {args.provider}")
 
     if normalized_provider:
         os.environ["CODEX_PROVIDER"] = normalized_provider
