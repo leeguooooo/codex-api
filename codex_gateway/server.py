@@ -924,20 +924,6 @@ async def chat_completions(
             finally:
                 if tmpdir is not None:
                     tmpdir.cleanup()
-                assembled = _maybe_strip_answer_tags(assembled_text).strip()
-                duration_ms = int((time.time() - t0) * 1000)
-                usage_str = f" usage={stream_usage}" if isinstance(stream_usage, dict) else ""
-                logger.info(
-                    "[%s] response status=200 duration_ms=%d chars=%d%s",
-                    resp_id,
-                    duration_ms,
-                    len(assembled),
-                    usage_str,
-                )
-                if log_mode == "qa" and assembled:
-                    logger.info("[%s] A:\n%s", resp_id, _truncate_for_log(assembled))
-                elif log_mode == "full" and assembled:
-                    logger.info("[%s] RESPONSE:\n%s", resp_id, _truncate_for_log(assembled))
 
             text = _maybe_strip_answer_tags(text).strip()
             duration_ms = int((time.time() - t0) * 1000)
@@ -1321,6 +1307,20 @@ async def chat_completions(
             finally:
                 if tmpdir is not None:
                     tmpdir.cleanup()
+                assembled = _maybe_strip_answer_tags(assembled_text).strip()
+                duration_ms = int((time.time() - t0) * 1000)
+                usage_str = f" usage={stream_usage}" if isinstance(stream_usage, dict) else ""
+                logger.info(
+                    "[%s] response status=200 duration_ms=%d chars=%d%s",
+                    resp_id,
+                    duration_ms,
+                    len(assembled),
+                    usage_str,
+                )
+                if log_mode == "qa" and assembled:
+                    logger.info("[%s] A:\n%s", resp_id, _truncate_for_log(assembled))
+                elif log_mode == "full" and assembled:
+                    logger.info("[%s] RESPONSE:\n%s", resp_id, _truncate_for_log(assembled))
 
         return StreamingResponse(sse_gen(), media_type="text/event-stream")
     except (asyncio.TimeoutError, TimeoutError):
