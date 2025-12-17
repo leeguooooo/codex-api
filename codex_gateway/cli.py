@@ -90,9 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional config preset (sets recommended env defaults).",
     )
     parser.add_argument(
-        "--no-env",
+        "--auto-env",
         action="store_true",
-        help="Disable auto-loading .env from the current directory.",
+        help="Auto-load .env from the current directory (default: off).",
     )
     return parser
 
@@ -110,15 +110,15 @@ def main(argv: list[str] | None = None) -> None:
         _maybe_load_dotenv(path)
         if path.exists():
             print(f"[agent-cli-to-api] loaded env: {path}")
-    elif not args.no_env:
-        loaded = False
+    elif args.auto_env:
+        # Opt-in legacy behavior: load .env from CWD if present.
         for candidate in _default_env_candidates():
             _maybe_load_dotenv(candidate)
             print(f"[agent-cli-to-api] loaded env: {candidate}")
-            loaded = True
             break
-        if not loaded:
-            print("[agent-cli-to-api] no .env found; using process environment")
+    else:
+        # Default: do not load any .env implicitly.
+        os.environ.setdefault("CODEX_NO_DOTENV", "1")
 
     if normalized_provider:
         os.environ["CODEX_PROVIDER"] = normalized_provider

@@ -48,6 +48,8 @@ uv run agent-cli-to-api claude
 uv run agent-cli-to-api cursor-agent
 ```
 
+By default `agent-cli-to-api` does NOT load `.env` implicitly.
+
 Optional auth:
 
 ```bash
@@ -168,10 +170,10 @@ console.log(resp.choices[0].message.content);
 
 ```bash
 cp .env.example .env
-uv run agent-cli-to-api codex
+uv run agent-cli-to-api codex --env-file .env
 ```
 
-The server auto-loads `.env` from the current directory (or `codex-api/.env` when running from this repo).
+Tip: you can also opt-in to loading `.env` from the current directory with `--auto-env`.
 
 ### Presets
 
