@@ -348,10 +348,9 @@ async def generate_oauth(
     url = f"{base_url.rstrip('/')}/v1/messages"
     
     t_prepare = time.time()
-    logger.info(
-        "claude-oauth request: url=%s model=%s max_tokens=%d msg_count=%d auth_ms=%d prepare_ms=%d",
+    logger.debug(
+        "claude-oauth request: url=%s model=%s max_tokens=%d msg_count=%d",
         url, model_name, max_tokens, len(messages),
-        int((t_auth - t0) * 1000), int((t_prepare - t_auth) * 1000)
     )
     
     client = await get_async_client("claude")
@@ -369,12 +368,10 @@ async def generate_oauth(
     data = resp.json()
     
     t_parse = time.time()
-    logger.info(
-        "claude-oauth response: status=%d api_latency_ms=%d parse_ms=%d total_ms=%d",
-        resp.status_code,
-        int((t_response - t_prepare) * 1000),
-        int((t_parse - t_response) * 1000),
-        int((t_parse - t0) * 1000)
+    api_latency_ms = int((t_response - t_prepare) * 1000)
+    logger.debug(
+        "claude-oauth response: status=%d api_latency_ms=%d",
+        resp.status_code, api_latency_ms,
     )
 
     return _extract_text_from_anthropic_response(data), _extract_usage_from_anthropic_response(data)
