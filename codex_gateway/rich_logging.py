@@ -18,7 +18,9 @@ def build_rich_log_config(*, level: str = "info") -> dict[str, Any]:
         "disable_existing_loggers": False,
         "formatters": {
             "default": {"format": "%(message)s"},
-            "access": {"format": '%(client_addr)s - "%(request_line)s" %(status_code)s'},
+            # Uvicorn's access logger already formats a readable message; avoid relying on
+            # version-specific LogRecord fields like `client_addr`.
+            "access": {"format": "%(message)s"},
         },
         "handlers": {
             "rich": {
@@ -48,4 +50,3 @@ def build_rich_log_config(*, level: str = "info") -> dict[str, Any]:
             "uvicorn.access": {"handlers": ["access_rich"], "level": lvl, "propagate": False},
         },
     }
-
