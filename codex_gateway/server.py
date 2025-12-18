@@ -905,14 +905,18 @@ async def chat_completions(
                     if content:
                         system_parts.append(content)
             
-            # Combine system + user messages
+            # Combine system + user messages with better formatting
             q_parts = []
             if system_parts:
-                q_parts.append("--- System ---\n" + "\n".join(system_parts))
+                # Use markdown header + blockquote for system message
+                sys_content = "\n".join(system_parts)
+                q_parts.append(f"**🔧 System**\n\n> {sys_content.replace(chr(10), chr(10) + '> ')}")
             if user_messages:
-                q_parts.append("--- User ---\n" + "\n".join(user_messages))
+                # Use markdown header for user message
+                user_content = "\n".join(user_messages)
+                q_parts.append(f"**👤 User**\n\n{user_content}")
             
-            q = "\n\n".join(q_parts) if q_parts else ""
+            q = "\n\n---\n\n".join(q_parts) if q_parts else ""
             if q:
                 if not _maybe_print_markdown(resp_id, "Q", q):
                     logger.info("[%s] Q:\n%s", resp_id, _truncate_for_log(q))
