@@ -869,15 +869,16 @@ async def chat_completions(
         # Print visual separator for easier request tracking
         if settings.log_render_markdown:
             _print_separator(resp_id, f"{provider}/{mode_label}", model=resolved_model)
-        
-        logger.info(
-            "[%s] ▶ model=%s provider=%s mode=%s stream=%s",
-            resp_id,
-            resolved_model,
-            provider,
-            mode_label,
-            req.stream,
-        )
+        else:
+            # Only show INFO log when not using rich panels
+            logger.info(
+                "[%s] ▶ model=%s provider=%s mode=%s stream=%s",
+                resp_id,
+                resolved_model,
+                provider,
+                mode_label,
+                req.stream,
+            )
         if settings.debug_log:
             eff = provider_model or _provider_default_model(provider) or "<default>"
             logger.info("[%s] provider_model effective=%s (client=%s)", resp_id, eff, provider_model or "<none>")
@@ -1284,8 +1285,6 @@ async def chat_completions(
 
             text = _maybe_strip_answer_tags(text).strip()
             duration_ms = int((time.time() - t0) * 1000)
-            usage_str = f" usage={usage}" if isinstance(usage, dict) else ""
-            logger.info("[%s] response status=200 duration_ms=%d chars=%d%s", resp_id, duration_ms, len(text), usage_str)
             
             # Record stats and decrement active count
             _active_requests -= 1
@@ -1294,10 +1293,19 @@ async def chat_completions(
             
             if log_mode == "qa" and text:
                 if not _maybe_print_markdown(resp_id, "A", text, duration_ms=duration_ms, usage=usage):
+                    # Fallback to plain logging
+                    usage_str = f" usage={usage}" if isinstance(usage, dict) else ""
+                    logger.info("[%s] response status=200 duration_ms=%d chars=%d%s", resp_id, duration_ms, len(text), usage_str)
                     logger.info("[%s] A:\n%s", resp_id, _truncate_for_log(text))
             elif log_mode == "full" and text:
                 if not _maybe_print_markdown(resp_id, "RESPONSE", text, duration_ms=duration_ms, usage=usage):
+                    usage_str = f" usage={usage}" if isinstance(usage, dict) else ""
+                    logger.info("[%s] response status=200 duration_ms=%d chars=%d%s", resp_id, duration_ms, len(text), usage_str)
                     logger.info("[%s] RESPONSE:\n%s", resp_id, _truncate_for_log(text))
+            elif not settings.log_render_markdown:
+                # Only log summary when not using rich panels
+                usage_str = f" usage={usage}" if isinstance(usage, dict) else ""
+                logger.info("[%s] response status=200 duration_ms=%d chars=%d%s", resp_id, duration_ms, len(text), usage_str)
             response: dict = {
                 "id": resp_id,
                 "object": "chat.completion",
@@ -1680,14 +1688,6 @@ async def chat_completions(
                     tmpdir.cleanup()
                 assembled = _maybe_strip_answer_tags(assembled_text).strip()
                 duration_ms = int((time.time() - t0) * 1000)
-                usage_str = f" usage={stream_usage}" if isinstance(stream_usage, dict) else ""
-                logger.info(
-                    "[%s] response status=200 duration_ms=%d chars=%d%s",
-                    resp_id,
-                    duration_ms,
-                    len(assembled),
-                    usage_str,
-                )
                 
                 # Record stats and decrement active count
                 _active_requests -= 1
@@ -1696,10 +1696,17 @@ async def chat_completions(
                 
                 if log_mode == "qa" and assembled:
                     if not _maybe_print_markdown(resp_id, "A", assembled, duration_ms=duration_ms, usage=stream_usage):
+                        usage_str = f" usage={stream_usage}" if isinstance(stream_usage, dict) else ""
+                        logger.info("[%s] response status=200 duration_ms=%d chars=%d%s", resp_id, duration_ms, len(assembled), usage_str)
                         logger.info("[%s] A:\n%s", resp_id, _truncate_for_log(assembled))
                 elif log_mode == "full" and assembled:
                     if not _maybe_print_markdown(resp_id, "RESPONSE", assembled, duration_ms=duration_ms, usage=stream_usage):
+                        usage_str = f" usage={stream_usage}" if isinstance(stream_usage, dict) else ""
+                        logger.info("[%s] response status=200 duration_ms=%d chars=%d%s", resp_id, duration_ms, len(assembled), usage_str)
                         logger.info("[%s] RESPONSE:\n%s", resp_id, _truncate_for_log(assembled))
+                elif not settings.log_render_markdown:
+                    usage_str = f" usage={stream_usage}" if isinstance(stream_usage, dict) else ""
+                    logger.info("[%s] response status=200 duration_ms=%d chars=%d%s", resp_id, duration_ms, len(assembled), usage_str)
 
         return StreamingResponse(sse_gen(), media_type="text/event-stream")
     except (asyncio.TimeoutError, TimeoutError):
