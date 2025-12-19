@@ -91,12 +91,19 @@ def _resolve_gemini_oauth2_js_path() -> Path | None:
     return None
 
 
+# Built-in Gemini CLI OAuth credentials (public, same as used by CLIProxyAPI and official gemini-cli).
+# These are embedded in the CLI binary and safe to use directly.
+_BUILTIN_GEMINI_OAUTH_CLIENT_ID = "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com"
+_BUILTIN_GEMINI_OAUTH_CLIENT_SECRET = "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"
+
+
 def resolve_gemini_oauth_client() -> tuple[str, str]:
     """
     Resolve the OAuth client id/secret used to refresh Gemini CLI tokens.
     Priority:
       1) env `GEMINI_OAUTH_CLIENT_ID` / `GEMINI_OAUTH_CLIENT_SECRET`
-      2) built-in defaults (matches Gemini CLI as of 0.19.x)
+      2) read from installed gemini CLI oauth2.js
+      3) built-in defaults (matches Gemini CLI as of 0.19.x) - FAST PATH
     """
     global _CACHED_OAUTH_CLIENT
     if _CACHED_OAUTH_CLIENT:
@@ -110,6 +117,8 @@ def resolve_gemini_oauth_client() -> tuple[str, str]:
             "Gemini OAuth client credentials are partially configured. "
             "Set both GEMINI_OAUTH_CLIENT_ID and GEMINI_OAUTH_CLIENT_SECRET, or unset both."
         )
+    
+    # Try reading from CLI installation first (may have newer credentials)
     oauth2_js = _resolve_gemini_oauth2_js_path()
     if oauth2_js:
         cid, sec = _read_oauth_client_from_oauth2_js(oauth2_js)
@@ -117,10 +126,10 @@ def resolve_gemini_oauth_client() -> tuple[str, str]:
             _CACHED_OAUTH_CLIENT = (cid, sec)
             return _CACHED_OAUTH_CLIENT
 
-    raise RuntimeError(
-        "Gemini OAuth client credentials are missing. "
-        "Set GEMINI_OAUTH_CLIENT_ID / GEMINI_OAUTH_CLIENT_SECRET."
-    )
+    # FAST PATH: Use built-in credentials (same as CLIProxyAPI)
+    # This avoids filesystem reads and works even without gemini CLI installed
+    _CACHED_OAUTH_CLIENT = (_BUILTIN_GEMINI_OAUTH_CLIENT_ID, _BUILTIN_GEMINI_OAUTH_CLIENT_SECRET)
+    return _CACHED_OAUTH_CLIENT
 
 
 def _secure_write_json(path: Path, obj: dict[str, Any]) -> None:
