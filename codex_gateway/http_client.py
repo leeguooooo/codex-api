@@ -39,6 +39,38 @@ async def aclose_all() -> None:
             pass
 
 
+def _parse_retry_delay(resp: httpx.Response) -> float | None:
+    """
+    Parse Retry-After delay from response.
+    Checks:
+      1. Retry-After header (seconds or HTTP date)
+      2. Gemini-style error body: error.details[].retryDelay (e.g. "0.847655010s")
+    Returns delay in seconds or None.
+    """
+    # Check Retry-After header first
+    retry_after = resp.headers.get("retry-after")
+    if retry_after:
+        try:
+            return float(retry_after)
+        except ValueError:
+            pass  # Could be HTTP date, ignore for simplicity
+
+    # Check Gemini-style error body for retryDelay
+    try:
+        body = resp.json() if resp.is_closed else None
+        if body and isinstance(body, dict):
+            details = body.get("error", {}).get("details", [])
+            for detail in details:
+                if detail.get("@type") == "type.googleapis.com/google.rpc.RetryInfo":
+                    delay_str = detail.get("retryDelay", "")
+                    if delay_str.endswith("s"):
+                        return float(delay_str[:-1])
+    except Exception:
+        pass
+
+    return None
+
+
 async def request_json_with_retries(
     *,
     client: httpx.AsyncClient,
@@ -68,4 +100,11 @@ async def request_json_with_retries(
             await resp.aread()
         except Exception:
             pass
-        await asyncio.sleep(backoff_s * (2 ** (attempt - 1)))
+
+        # Smart backoff: use Retry-After if available, otherwise exponential
+        delay = _parse_retry_delay(resp)
+        if delay is None:
+            delay = backoff_s * (2 ** (attempt - 1))
+        # Cap delay to avoid absurdly long waits
+        delay = min(delay, 30.0)
+        await asyncio.sleep(delay)
