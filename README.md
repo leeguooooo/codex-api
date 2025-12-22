@@ -312,22 +312,21 @@ and include their tool schemas in the prompt. This can add **seconds of startup 
 
 For an HTTP gateway, it’s usually best to run Codex with a minimal config (no MCP servers).
 
-This project **defaults** to a gateway-local HOME at `./.codex-gateway-home` so it doesn’t inherit your global `~/.codex/config.toml`.
-On first run it will try to copy `~/.codex/auth.json` into `./.codex-gateway-home/.codex/auth.json` (so you don’t have to).
+By default the gateway uses your system `~/.codex` (so auth stays in sync).
+If you want a minimal, isolated config (no MCP servers), set `CODEX_CLI_HOME` to a gateway-local directory.
+On first run it will try to copy `~/.codex/auth.json` into that directory (so you don’t have to).
 
 If you want to set it up manually or customize it:
 
 ```bash
-mkdir -p .codex-gateway-home/.codex
-cp ~/.codex/auth.json .codex-gateway-home/.codex/auth.json   # or set CODEX_API_KEY instead
-cat > .codex-gateway-home/.codex/config.toml <<'EOF'
+export CODEX_CLI_HOME=$PWD/.codex-gateway-home
+mkdir -p "$CODEX_CLI_HOME/.codex"
+cp ~/.codex/auth.json "$CODEX_CLI_HOME/.codex/auth.json"   # or set CODEX_API_KEY instead
+cat > "$CODEX_CLI_HOME/.codex/config.toml" <<'EOF'
 model = "gpt-5.2"
 model_reasoning_effort = "low"
 
 [projects."/path/to/your/workspace"]
 trust_level = "trusted"
 EOF
-
-# Optional override (the default is already ./.codex-gateway-home):
-export CODEX_CLI_HOME=$PWD/.codex-gateway-home
 ```

@@ -336,11 +336,12 @@ class Settings:
     workspace: str = _resolve_workspace()
 
     # Optional HOME override for the Codex CLI subprocess. Use this to point at a minimal
-    # `~/.codex/config.toml` (e.g. without MCP servers) for much lower latency.
+    # `~/.codex/config.toml` (e.g. without MCP servers) for much lower latency. When unset,
+    # the system `~/.codex` is used.
     codex_cli_home: str | None = (
         None
         if _env_bool("CODEX_USE_SYSTEM_CODEX_HOME", False)
-        else (os.environ.get("CODEX_CLI_HOME") or _DEFAULT_CODEX_CLI_HOME)
+        else (_env_str("CODEX_CLI_HOME", "").strip() or None)
     )
 
     # Codex CLI options.
@@ -467,6 +468,10 @@ class Settings:
     log_max_chars: int = _env_int("CODEX_LOG_MAX_CHARS", 4000)
     rich_logs: bool = _env_bool("CODEX_RICH_LOGS", False)
     log_render_markdown: bool = _env_bool("CODEX_LOG_RENDER_MARKDOWN", False)
+    log_request_curl: bool = _env_bool("CODEX_LOG_REQUEST_CURL", False)
+    log_stream_deltas: bool = _env_bool("CODEX_LOG_STREAM_DELTAS", False)
+    log_stream_inline: bool = _env_bool("CODEX_LOG_STREAM_INLINE", False)
+    log_stream_inline_suppress_final: bool = _env_bool("CODEX_LOG_STREAM_INLINE_SUPPRESS_FINAL", True)
 
     def effective_log_mode(self) -> str:
         mode = (self.log_mode or "").strip().lower()
